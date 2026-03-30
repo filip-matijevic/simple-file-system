@@ -17,5 +17,15 @@ public class FileSystemDbContext : DbContext
             .WithOne(n => n.Parent)
             .HasForeignKey(n => n.ParentId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Models.Node>()
+            .HasIndex(n => new { n.Name, n.ParentId, n.Type })
+            .IsUnique()
+            .HasFilter("[ParentId] IS NOT NULL");
+
+        modelBuilder.Entity<Models.Node>()
+            .HasIndex(n => new { n.Name, n.Type })
+            .IsUnique()
+            .HasFilter("[ParentId] IS NULL");    
     }
 }

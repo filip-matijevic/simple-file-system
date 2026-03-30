@@ -24,32 +24,20 @@ namespace simple_file_system.API.Controllers
         [HttpPost("file")]
         public async Task<IActionResult> CreateFile([FromBody] CreateFileDTO dto)
         {
-            if (string.IsNullOrWhiteSpace(dto.Name))
-            {
-                return BadRequest("Name cannot be empty.");
-            }
             Node createdFile = await _fileSystemService.CreateFileAsync(dto);
             return CreatedAtAction(nameof(GetFileSystem), new { id = createdFile.Id }, dto);
         }
         [HttpPost("directory")]
-        public async Task<IActionResult> CreateDirectory([FromBody] CreateDirectoryDTO dto){
-            // Implementation for creating a directory
-                if (string.IsNullOrWhiteSpace(dto.Name))
-                {
-                    return BadRequest("Name cannot be empty.");
-                }
+        public async Task<IActionResult> CreateDirectory([FromBody] CreateDirectoryDTO dto)
+        {
             Node createdDirectory = await _fileSystemService.CreateDirectoryAsync(dto);
             return CreatedAtAction(nameof(GetFileSystem), new { id = createdDirectory.Id }, dto);
         }
 
-        [HttpDelete("/filesystem/{id}")]
+        [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteNode(long id)
         {
-            bool deletedNode = await _fileSystemService.DeleteNodeAsync(id);
-            if (!deletedNode)
-            {
-                return NotFound();
-            }
+            await _fileSystemService.DeleteNodeAsync(id);
             return NoContent();
         }
     }

@@ -1,11 +1,12 @@
-using System;
 using System.Net;
+using simple_file_system.API.Exceptions;
 
 namespace simple_file_system.API.Middleware;
 
 public class ExceptionMiddleware
 {
     private readonly RequestDelegate _next;
+
     public ExceptionMiddleware(RequestDelegate next)
     {
         _next = next;
@@ -19,15 +20,18 @@ public class ExceptionMiddleware
         }
         catch (Exception ex)
         {
-            await WriteResponseAsync(context, HttpStatusCode.InternalServerError, ex.Message);
+            var (statusCode, title, detail) = ex is AppException appEx
+                ? (appEx.StatusCode, appEx.Title, appEx.Detail)
+                : (HttpStatusCode.InternalServerError, "Internal Server Error", "An unexpected error occurred.");
+
+            await WriteResponseAsync(context, statusCode, title, detail);
         }
     }
 
-    private static async Task WriteResponseAsync(HttpContext context, HttpStatusCode statusCode, string message)
+    private static async Task WriteResponseAsync(HttpContext context, HttpStatusCode statusCode, string title, string detail)
     {
         context.Response.ContentType = "application/json";
         context.Response.StatusCode = (int)statusCode;
-        await context.Response.WriteAsJsonAsync(new { error = message });
+        await context.Response.WriteAsJsonAsync(new { title, detail });
     }
-
 }

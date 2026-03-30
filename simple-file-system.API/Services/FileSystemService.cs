@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using simple_file_system.API.Data;
 using simple_file_system.API.DTOs;
 using simple_file_system.API.Models;
@@ -13,74 +14,101 @@ public class FileSystemService : IFileSystemService
     }
     public async Task<Node> CreateDirectoryAsync(CreateDirectoryDTO directoryDto)
     {
-        if(directoryDto.ParentId.HasValue)
+        if (string.IsNullOrWhiteSpace(directoryDto.Name))
+            throw new Exceptions.ValidationException("Name cannot be empty.");
+
+        if (directoryDto.ParentId.HasValue)
         {
             var parent = await _context.Nodes.FindAsync(directoryDto.ParentId.Value);
             if (parent is null)
             {
-                throw new Exception("Parent directory not found.");
+                throw new Exceptions.NotFoundException($"Parent node with id {directoryDto.ParentId} does not exist.");
             }
 
             if (parent.Type != NodeType.Directory)
             {
-                throw new Exception("Parent node must be a directory.");
+                throw new Exceptions.InvalidOperationException($"Parent node with id {directoryDto.ParentId} is not a directory.");
             }
         }
 
-        Node newNode = new Node
+        if (await NodeExistsAsync(directoryDto.Name, directoryDto.ParentId, NodeType.Directory))
         {
-            Name = directoryDto.Name,
-            Type = NodeType.Directory,
-            ParentId = directoryDto.ParentId
-        };
+            throw new Exceptions.ConflictException($"A directory named '{directoryDto.Name}' already exists in this location.");
+        }
 
-        _context.Nodes.Add(newNode);
-        await _context.SaveChangesAsync();
-        return newNode;
+        try
+        {
+            Node newNode = new Node
+            {
+                Name = directoryDto.Name,
+                Type = NodeType.Directory,
+                ParentId = directoryDto.ParentId
+            };
 
+            _context.Nodes.Add(newNode);
+            await _context.SaveChangesAsync();
+            return newNode;
+        }
+        catch (DbUpdateException)
+        {
+            throw new Exceptions.ConflictException($"A directory named '{directoryDto.Name}' already exists in this location.");
+        }
     }
 
     public async Task<Node> CreateFileAsync(CreateFileDTO fileDto)
     {
+        if (string.IsNullOrWhiteSpace(fileDto.Name))
+            throw new Exceptions.ValidationException("Name cannot be empty.");
+
         if (fileDto.ParentId.HasValue)
         {
             var parent = await _context.Nodes.FindAsync(fileDto.ParentId.Value);
             if (parent is null)
             {
-                throw new Exception("Parent directory not found.");
+                throw new Exceptions.NotFoundException($"Parent node with id {fileDto.ParentId} does not exist.");
             }
 
             if (parent.Type != NodeType.Directory)
             {
-                throw new Exception("Parent node must be a directory.");
+                throw new Exceptions.InvalidOperationException($"Node {fileDto.ParentId} is a file and cannot contain children.");
             }
         }
 
-        Node newNode = new Node
+        if (await NodeExistsAsync(fileDto.Name, fileDto.ParentId, NodeType.File))
         {
-            Name = fileDto.Name,
-            Type = NodeType.File,
-            ParentId = fileDto.ParentId
-        };
+            throw new Exceptions.ConflictException($"A file named '{fileDto.Name}' already exists in this location.");
+        }
 
-        _context.Nodes.Add(newNode);
-        await _context.SaveChangesAsync();
-        return newNode;
+        try
+        {
+            Node newNode = new Node { Name = fileDto.Name, Type = NodeType.File, ParentId = fileDto.ParentId };
+            _context.Nodes.Add(newNode);
+            await _context.SaveChangesAsync();
+            return newNode;
+        }
+        catch (DbUpdateException)
+        {
+            throw new Exceptions.ConflictException($"A file named '{fileDto.Name}' already exists in this location.");
+        }
     }
 
-    public async Task<bool> DeleteNodeAsync(long id)
+    public async Task DeleteNodeAsync(long id)
     {
         Node? deleteNode = await _context.Nodes.FindAsync(id);
         if (deleteNode is null)
-            return false;
+            throw new Exceptions.NotFoundException($"Node with id {id} does not exist.");
 
         _context.Nodes.Remove(deleteNode);
         await _context.SaveChangesAsync();
-        return true;
     }
 
     public async Task<Node?> GetNodeAsync(long id)
     {
         return await _context.Nodes.FindAsync(id);
+    }
+
+    private async Task<bool> NodeExistsAsync(string name, long? parentId, NodeType type)
+    {
+        return await _context.Nodes.AnyAsync(n => n.Name == name && n.ParentId == parentId && n.Type == type);
     }
 }
