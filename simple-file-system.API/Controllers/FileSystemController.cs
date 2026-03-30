@@ -40,5 +40,12 @@ namespace simple_file_system.API.Controllers
             await _fileSystemService.DeleteNodeAsync(id);
             return NoContent();
         }
+
+        [HttpGet("search")]
+        public async Task<IActionResult> SearchNodes([FromQuery] string query, [FromQuery] long? parentId)
+        {
+            var results = await _fileSystemService.SearchNodesAsync(query, parentId);
+            return Ok(results);
+        }
     }
 }

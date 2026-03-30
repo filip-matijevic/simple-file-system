@@ -1,4 +1,3 @@
-using System;
 using simple_file_system.API.DTOs;
 using simple_file_system.API.Models;
 
@@ -10,4 +9,5 @@ public interface IFileSystemService
     Task<Node> CreateDirectoryAsync(CreateDirectoryDTO directoryDto);
     Task<Node?> GetNodeAsync(long id);
     Task DeleteNodeAsync(long id);
+    Task<IEnumerable<string>> SearchNodesAsync(string query, long? parentId);
 }

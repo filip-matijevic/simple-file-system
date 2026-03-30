@@ -107,6 +107,40 @@ public class FileSystemService : IFileSystemService
         return await _context.Nodes.FindAsync(id);
     }
 
+    public async Task<IEnumerable<string>> SearchNodesAsync(string query, long? parentId)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+            throw new Exceptions.ValidationException("Query cannot be empty.");
+            
+        if (parentId.HasValue)
+        {
+            Node? parent = await _context.Nodes.FindAsync(parentId.Value);
+            if (parent is null)
+                throw new Exceptions.NotFoundException($"Parent node with id {parentId} does not exist.");
+        }
+
+        var sql = parentId.HasValue
+            ? @"WITH RECURSIVE paths(id, name, path) AS (
+               SELECT id, name, name FROM Nodes WHERE id = {1}
+               UNION ALL
+               SELECT n.id, n.name, p.path || '/' || n.name
+               FROM Nodes n JOIN paths p ON n.ParentId = p.id
+           )
+           SELECT path FROM paths WHERE name LIKE {0} ORDER BY path"
+            :
+            @"WITH RECURSIVE paths(id, name, path) AS (
+               SELECT id, name, name FROM Nodes WHERE ParentId IS NULL
+               UNION ALL
+               SELECT n.id, n.name, p.path || '/' || n.name
+               FROM Nodes n JOIN paths p ON n.ParentId = p.id
+           )
+           SELECT path FROM paths WHERE name LIKE {0} ORDER BY path";
+
+        return await _context.Database
+                .SqlQueryRaw<string>(sql, query + "%", parentId ?? (object)DBNull.Value)
+                .ToListAsync();
+    }
+
     private async Task<bool> NodeExistsAsync(string name, long? parentId, NodeType type)
     {
         return await _context.Nodes.AnyAsync(n => n.Name == name && n.ParentId == parentId && n.Type == type);
