@@ -73,7 +73,6 @@ namespace simple_file_system.API.Controllers
 
         [HttpGet("search")]
         [ProducesResponseType(typeof(IEnumerable<string>), StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> SearchNodes([FromQuery] string? query, [FromQuery] long? parentId)
         {

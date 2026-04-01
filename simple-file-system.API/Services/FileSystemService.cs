@@ -60,9 +60,6 @@ public class FileSystemService : IFileSystemService
 
     public async Task<IEnumerable<string>> SearchNodesAsync(string? query, long? parentId)
     {
-        if (query is not null && string.IsNullOrWhiteSpace(query))
-            throw new Exceptions.ValidationException("Query cannot be empty.");
-            
         if (parentId.HasValue)
         {
             Node? parent = await _context.Nodes.FindAsync(parentId.Value);
