@@ -6,10 +6,12 @@ namespace simple_file_system.API.Middleware;
 public class ExceptionMiddleware
 {
     private readonly RequestDelegate _next;
+    private readonly ILogger<ExceptionMiddleware> _logger;
 
-    public ExceptionMiddleware(RequestDelegate next)
+    public ExceptionMiddleware(RequestDelegate next, ILogger<ExceptionMiddleware> logger)
     {
         _next = next;
+        _logger = logger;
     }
 
     public async Task InvokeAsync(HttpContext context)
@@ -18,13 +20,15 @@ public class ExceptionMiddleware
         {
             await _next(context);
         }
+        catch (AppException ex)
+        {
+            _logger.LogWarning(ex, "Domain exception: {Title} — {Detail}", ex.Title, ex.Detail);
+            await WriteResponseAsync(context, ex.StatusCode, ex.Title, ex.Detail);
+        }
         catch (Exception ex)
         {
-            var (statusCode, title, detail) = ex is AppException appEx
-                ? (appEx.StatusCode, appEx.Title, appEx.Detail)
-                : (HttpStatusCode.InternalServerError, "Internal Server Error", "An unexpected error occurred.");
-
-            await WriteResponseAsync(context, statusCode, title, detail);
+            _logger.LogError(ex, "Unhandled exception on {Method} {Path}", context.Request.Method, context.Request.Path);
+            await WriteResponseAsync(context, HttpStatusCode.InternalServerError, "Internal Server Error", "An unexpected error occurred.");
         }
     }
 

@@ -19,13 +19,13 @@ public class FileSystemDbContext : DbContext
             .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<Models.Node>()
-            .HasIndex(n => new { n.Name, n.ParentId, n.Type })
+            .HasIndex(n => new { n.Name, n.ParentId })
             .IsUnique()
             .HasFilter("[ParentId] IS NOT NULL");
 
         modelBuilder.Entity<Models.Node>()
-            .HasIndex(n => new { n.Name, n.Type })
+            .HasIndex(n => n.Name)
             .IsUnique()
-            .HasFilter("[ParentId] IS NULL");    
+            .HasFilter("[ParentId] IS NULL");
     }
 }

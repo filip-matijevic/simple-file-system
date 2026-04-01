@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using simple_file_system.API.Data;
-using simple_file_system.API.DTOs;
 using simple_file_system.API.Models;
 
 namespace simple_file_system.API.Services;
@@ -12,84 +11,36 @@ public class FileSystemService : IFileSystemService
     {
         _context = context;
     }
-    public async Task<Node> CreateDirectoryAsync(CreateDirectoryDTO directoryDto)
+    public async Task<Node> CreateDirectoryAsync(string name, long? parentId)
     {
-        if (string.IsNullOrWhiteSpace(directoryDto.Name))
+        if (string.IsNullOrWhiteSpace(name))
             throw new Exceptions.ValidationException("Name cannot be empty.");
 
-        if (directoryDto.ParentId.HasValue)
-        {
-            var parent = await _context.Nodes.FindAsync(directoryDto.ParentId.Value);
-            if (parent is null)
-            {
-                throw new Exceptions.NotFoundException($"Parent node with id {directoryDto.ParentId} does not exist.");
-            }
+        await ValidateParentAsync(parentId);
 
-            if (parent.Type != NodeType.Directory)
-            {
-                throw new Exceptions.InvalidOperationException($"Parent node with id {directoryDto.ParentId} is not a directory.");
-            }
-        }
+        if (await NodeExistsAsync(name, parentId))
+            throw new Exceptions.ConflictException($"A node named '{name}' already exists in this location.");
 
-        if (await NodeExistsAsync(directoryDto.Name, directoryDto.ParentId, NodeType.Directory))
-        {
-            throw new Exceptions.ConflictException($"A directory named '{directoryDto.Name}' already exists in this location.");
-        }
-
-        try
-        {
-            Node newNode = new Node
-            {
-                Name = directoryDto.Name,
-                Type = NodeType.Directory,
-                ParentId = directoryDto.ParentId
-            };
-
-            _context.Nodes.Add(newNode);
-            await _context.SaveChangesAsync();
-            return newNode;
-        }
-        catch (DbUpdateException)
-        {
-            throw new Exceptions.ConflictException($"A directory named '{directoryDto.Name}' already exists in this location.");
-        }
+        Node newNode = new() { Name = name, Type = NodeType.Directory, ParentId = parentId };
+        _context.Nodes.Add(newNode);
+        await _context.SaveChangesAsync();
+        return newNode;
     }
 
-    public async Task<Node> CreateFileAsync(CreateFileDTO fileDto)
+    public async Task<Node> CreateFileAsync(string name, long? parentId)
     {
-        if (string.IsNullOrWhiteSpace(fileDto.Name))
+        if (string.IsNullOrWhiteSpace(name))
             throw new Exceptions.ValidationException("Name cannot be empty.");
 
-        if (fileDto.ParentId.HasValue)
-        {
-            var parent = await _context.Nodes.FindAsync(fileDto.ParentId.Value);
-            if (parent is null)
-            {
-                throw new Exceptions.NotFoundException($"Parent node with id {fileDto.ParentId} does not exist.");
-            }
+        await ValidateParentAsync(parentId);
 
-            if (parent.Type != NodeType.Directory)
-            {
-                throw new Exceptions.InvalidOperationException($"Node {fileDto.ParentId} is a file and cannot contain children.");
-            }
-        }
+        if (await NodeExistsAsync(name, parentId))
+            throw new Exceptions.ConflictException($"A node named '{name}' already exists in this location.");
 
-        if (await NodeExistsAsync(fileDto.Name, fileDto.ParentId, NodeType.File))
-        {
-            throw new Exceptions.ConflictException($"A file named '{fileDto.Name}' already exists in this location.");
-        }
-
-        try
-        {
-            Node newNode = new Node { Name = fileDto.Name, Type = NodeType.File, ParentId = fileDto.ParentId };
-            _context.Nodes.Add(newNode);
-            await _context.SaveChangesAsync();
-            return newNode;
-        }
-        catch (DbUpdateException)
-        {
-            throw new Exceptions.ConflictException($"A file named '{fileDto.Name}' already exists in this location.");
-        }
+        Node newNode = new() { Name = name, Type = NodeType.File, ParentId = parentId };
+        _context.Nodes.Add(newNode);
+        await _context.SaveChangesAsync();
+        return newNode;
     }
 
     public async Task DeleteNodeAsync(long id)
@@ -107,9 +58,9 @@ public class FileSystemService : IFileSystemService
         return await _context.Nodes.FindAsync(id);
     }
 
-    public async Task<IEnumerable<string>> SearchNodesAsync(string query, long? parentId)
+    public async Task<IEnumerable<string>> SearchNodesAsync(string? query, long? parentId)
     {
-        if (string.IsNullOrWhiteSpace(query))
+        if (query is not null && string.IsNullOrWhiteSpace(query))
             throw new Exceptions.ValidationException("Query cannot be empty.");
             
         if (parentId.HasValue)
@@ -141,8 +92,21 @@ public class FileSystemService : IFileSystemService
                 .ToListAsync();
     }
 
-    private async Task<bool> NodeExistsAsync(string name, long? parentId, NodeType type)
+    private async Task<bool> NodeExistsAsync(string name, long? parentId)
     {
-        return await _context.Nodes.AnyAsync(n => n.Name == name && n.ParentId == parentId && n.Type == type);
+        return await _context.Nodes.AnyAsync(n => n.Name == name && n.ParentId == parentId);
+    }
+
+    private async Task ValidateParentAsync(long? parentId)
+    {
+        if (parentId is null)
+            return;
+
+        var parent = await _context.Nodes.FindAsync(parentId.Value);
+        if (parent is null)
+            throw new Exceptions.NotFoundException($"Parent node with id {parentId} does not exist.");
+
+        if (parent.Type != NodeType.Directory)
+            throw new Exceptions.InvalidOperationException($"Parent node with id {parentId} is not a directory.");
     }
 }
